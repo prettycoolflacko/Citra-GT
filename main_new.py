@@ -43,7 +43,8 @@ class ImageProcessorApp(QMainWindow):
         self.active_image = None
         self.original_image = None
         self.preview_image = None
-        self.current_pixmap = None
+        self.current_original_pixmap = None
+        self.current_filtered_pixmap = None
 
         self.active_slider_values = {}
         self.active_one_click_filters = set()
@@ -114,16 +115,65 @@ class ImageProcessorApp(QMainWindow):
         center_panel = QWidget()
         center_layout = QVBoxLayout(center_panel)
         
-        self.image_label = QLabel("Silakan upload gambar atau mulai kamera...")
-        self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        center_layout.addWidget(self.image_label, 7) 
+        # Image comparison section
+        image_comparison_layout = QHBoxLayout()
         
-        self.histogram_label = QLabel("Histogram akan muncul di sini")
-        self.histogram_label.setAlignment(Qt.AlignCenter)
-        self.histogram_label.setMinimumHeight(150)
-        self.histogram_label.setMaximumHeight(200)
-        center_layout.addWidget(self.histogram_label, 3) 
+        # Original image section
+        original_section = QWidget()
+        original_layout = QVBoxLayout(original_section)
+        original_title = QLabel("<h3 style='color: #55AAFF;'>Original</h3>")
+        original_title.setAlignment(Qt.AlignCenter)
+        self.original_image_label = QLabel("Original akan muncul di sini")
+        self.original_image_label.setAlignment(Qt.AlignCenter)
+        self.original_image_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.original_image_label.setStyleSheet("border: 2px solid #444444; background-color: #1E1E1E;")
+        original_layout.addWidget(original_title)
+        original_layout.addWidget(self.original_image_label, 1)
+        
+        # Filtered image section
+        filtered_section = QWidget()
+        filtered_layout = QVBoxLayout(filtered_section)
+        filtered_title = QLabel("<h3 style='color: #55AAFF;'>Filtered</h3>")
+        filtered_title.setAlignment(Qt.AlignCenter)
+        self.filtered_image_label = QLabel("Filtered akan muncul di sini")
+        self.filtered_image_label.setAlignment(Qt.AlignCenter)
+        self.filtered_image_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.filtered_image_label.setStyleSheet("border: 2px solid #444444; background-color: #1E1E1E;")
+        filtered_layout.addWidget(filtered_title)
+        filtered_layout.addWidget(self.filtered_image_label, 1)
+        
+        image_comparison_layout.addWidget(original_section)
+        image_comparison_layout.addWidget(filtered_section)
+        
+        center_layout.addLayout(image_comparison_layout, 6)
+        
+        # Histogram comparison section
+        histogram_layout = QHBoxLayout()
+        
+        # Original histogram
+        original_hist_section = QWidget()
+        original_hist_layout = QVBoxLayout(original_hist_section)
+        self.original_histogram_label = QLabel("Histogram Original")
+        self.original_histogram_label.setAlignment(Qt.AlignCenter)
+        self.original_histogram_label.setMinimumHeight(150)
+        self.original_histogram_label.setMaximumHeight(200)
+        self.original_histogram_label.setStyleSheet("border: 1px solid #444444;")
+        original_hist_layout.addWidget(self.original_histogram_label)
+        
+        # Filtered histogram
+        filtered_hist_section = QWidget()
+        filtered_hist_layout = QVBoxLayout(filtered_hist_section)
+        self.filtered_histogram_label = QLabel("Histogram Filtered")
+        self.filtered_histogram_label.setAlignment(Qt.AlignCenter)
+        self.filtered_histogram_label.setMinimumHeight(150)
+        self.filtered_histogram_label.setMaximumHeight(200)
+        self.filtered_histogram_label.setStyleSheet("border: 1px solid #444444;")
+        filtered_hist_layout.addWidget(self.filtered_histogram_label)
+        
+        histogram_layout.addWidget(original_hist_section)
+        histogram_layout.addWidget(filtered_hist_section)
+        
+        center_layout.addLayout(histogram_layout, 3) 
         
         right_panel = QWidget()
         right_panel.setFixedWidth(300)
@@ -367,7 +417,8 @@ class ImageProcessorApp(QMainWindow):
                 self.set_all_controls_enabled(True)
             except Exception as e:
                 print(f"Error loading image: {e}")
-                self.image_label.setText(f"Gagal membuka gambar: {e}")
+                self.original_image_label.setText(f"Gagal membuka gambar: {e}")
+                self.filtered_image_label.setText(f"Gagal membuka gambar: {e}")
                 self.active_image = None
                 self.original_image = None
                 self.set_all_controls_enabled(False)
@@ -388,33 +439,53 @@ class ImageProcessorApp(QMainWindow):
             self.reset_filters_and_commit()
             self.update_preview()
 
-    def display_image(self, img_to_display):
-        if img_to_display:
+    def display_image(self, original_img, filtered_img):
+        """Display both original and filtered images with their histograms"""
+        if original_img and filtered_img:
             try:
-                if img_to_display.mode != 'RGB':
-                    img_to_display = img_to_display.convert('RGB')
+                # Convert images to RGB if needed
+                if original_img.mode != 'RGB':
+                    original_img = original_img.convert('RGB')
+                if filtered_img.mode != 'RGB':
+                    filtered_img = filtered_img.convert('RGB')
                 
-                self.current_pixmap = self.pil_to_pixmap(img_to_display)
-                if self.current_pixmap and not self.current_pixmap.isNull():
+                # Create pixmaps
+                self.current_original_pixmap = self.pil_to_pixmap(original_img)
+                self.current_filtered_pixmap = self.pil_to_pixmap(filtered_img)
+                
+                if self.current_original_pixmap and not self.current_original_pixmap.isNull() and \
+                   self.current_filtered_pixmap and not self.current_filtered_pixmap.isNull():
                     self.update_image_display()
-                    self.update_histogram(img_to_display)
+                    self.update_histogram(original_img, self.original_histogram_label, "Original")
+                    self.update_histogram(filtered_img, self.filtered_histogram_label, "Filtered")
                 else:
                     raise Exception("Failed to create valid QPixmap")
             except Exception as e:
                 print(f"Error displaying image: {e}")
-                self.image_label.setText(f"Gagal menampilkan gambar: {e}")
-                self.current_pixmap = None
+                self.original_image_label.setText(f"Gagal menampilkan gambar: {e}")
+                self.filtered_image_label.setText(f"Gagal menampilkan gambar: {e}")
+                self.current_original_pixmap = None
+                self.current_filtered_pixmap = None
         else:
-            self.image_label.setText("Tidak ada gambar.")
-            self.histogram_label.clear()
-            self.current_pixmap = None
+            self.original_image_label.setText("Original akan muncul di sini")
+            self.filtered_image_label.setText("Filtered akan muncul di sini")
+            self.original_histogram_label.setText("Histogram Original")
+            self.filtered_histogram_label.setText("Histogram Filtered")
+            self.current_original_pixmap = None
+            self.current_filtered_pixmap = None
             
     def update_image_display(self):
-        if self.current_pixmap:
-            scaled_pixmap = self.current_pixmap.scaled(self.image_label.size(),
-                                                       Qt.KeepAspectRatio,
-                                                       Qt.SmoothTransformation)
-            self.image_label.setPixmap(scaled_pixmap)
+        if self.current_original_pixmap:
+            scaled_original = self.current_original_pixmap.scaled(self.original_image_label.size(),
+                                                                   Qt.KeepAspectRatio,
+                                                                   Qt.SmoothTransformation)
+            self.original_image_label.setPixmap(scaled_original)
+        
+        if self.current_filtered_pixmap:
+            scaled_filtered = self.current_filtered_pixmap.scaled(self.filtered_image_label.size(),
+                                                                   Qt.KeepAspectRatio,
+                                                                   Qt.SmoothTransformation)
+            self.filtered_image_label.setPixmap(scaled_filtered)
 
     def resizeEvent(self, event):
         self.update_image_display()
@@ -437,7 +508,8 @@ class ImageProcessorApp(QMainWindow):
             self.btn_snapshot.setEnabled(True)
             self.set_all_controls_enabled(True)
         except Exception as e:
-            self.image_label.setText(f"Error Kamera: {e}")
+            self.original_image_label.setText(f"Error Kamera: {e}")
+            self.filtered_image_label.setText(f"Error Kamera: {e}")
             if self.camera: self.camera.release()
 
     def stop_camera(self):
@@ -451,8 +523,10 @@ class ImageProcessorApp(QMainWindow):
         self.btn_snapshot.setEnabled(False)
         if not self.active_image:
             self.set_all_controls_enabled(False)
-            self.image_label.setText("Kamera berhenti. Upload gambar atau mulai lagi.")
-            self.histogram_label.clear()
+            self.original_image_label.setText("Kamera berhenti. Upload gambar atau mulai lagi.")
+            self.filtered_image_label.setText("Kamera berhenti. Upload gambar atau mulai lagi.")
+            self.original_histogram_label.clear()
+            self.filtered_histogram_label.clear()
 
     def update_camera_frame(self):
         if self.camera:
@@ -462,10 +536,11 @@ class ImageProcessorApp(QMainWindow):
                 slider_vals = self.active_slider_values
                 filter_set = self.active_one_click_filters
                 self.preview_image = self.apply_filter_pipeline(base_pil_frame, slider_vals, filter_set)
-                self.display_image(self.preview_image)
+                self.display_image(base_pil_frame, self.preview_image)
             else:
                 self.stop_camera()
-                self.image_label.setText("Error membaca frame.")
+                self.original_image_label.setText("Error membaca frame.")
+                self.filtered_image_label.setText("Error membaca frame.")
 
     def take_snapshot(self):
         if self.preview_image:
@@ -475,7 +550,7 @@ class ImageProcessorApp(QMainWindow):
             self.reset_filters_and_commit()
             self.update_preview()
     
-    def update_histogram(self, pil_img):
+    def update_histogram(self, pil_img, label_widget, title_prefix):
         try:
             width, height = pil_img.size
             total_pixels = width * height
@@ -498,8 +573,8 @@ class ImageProcessorApp(QMainWindow):
                 
             plt.xlim([0, 256])
             plt.yticks([])
-            plt.xticks(color='white')
-            plt.title(f"Histogram (Total Pixels: {total_pixels:,})", color='white', fontsize=10)
+            plt.xticks(color='white', fontsize=8)
+            plt.title(f"{title_prefix} - {total_pixels:,} pixels", color='white', fontsize=9)
             plt.gca().tick_params(axis='x', colors='white')
             plt.gca().spines['top'].set_visible(False)
             plt.gca().spines['right'].set_visible(False)
@@ -514,12 +589,12 @@ class ImageProcessorApp(QMainWindow):
             qimage.loadFromData(buf.getvalue(), 'PNG')
             pixmap = QPixmap.fromImage(qimage)
             
-            self.histogram_label.setPixmap(pixmap)
+            label_widget.setPixmap(pixmap)
             plt.close()
 
         except Exception as e:
             print(f"Error update histogram: {e}")
-            self.histogram_label.setText("Error histogram")
+            label_widget.setText(f"Error histogram: {e}")
 
     def on_slider_changed(self):
         self.active_slider_values = {name: s.value() for name, s in self.sliders.items()}
@@ -543,7 +618,7 @@ class ImageProcessorApp(QMainWindow):
         filter_set = self.active_one_click_filters
         
         self.preview_image = self.apply_filter_pipeline(self.active_image, slider_vals, filter_set)
-        self.display_image(self.preview_image)
+        self.display_image(self.active_image, self.preview_image)
 
     def apply_filter_pipeline(self, base_image, slider_vals, filter_set):
         img = base_image.copy()
